@@ -1,0 +1,23 @@
+# Secret keys — NEVER commit these
+.env
+
+# ChromaDB vector index (large, rebuild with index_docs.py)
+sama_db/
+
+# PDF (too large for GitHub, add manually)
+sama_csf.pdf
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# HuggingFace model cache
+.cache/

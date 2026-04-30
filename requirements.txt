@@ -1,0 +1,27 @@
+# SAMA CSF Compliance Chatbot — Python dependencies
+# Install with: pip install -r requirements.txt
+
+# ── LangChain ecosystem ──────────────────────────────────────────────────────
+langchain>=0.2.0           # Core LangChain framework (chains, prompts, retrievers)
+langchain-anthropic>=0.1.0 # Anthropic Claude integration for LangChain
+langchain-community>=0.2.0 # Community loaders: PyPDFLoader, Chroma, HuggingFaceEmbeddings, etc.
+
+# ── Vector database ──────────────────────────────────────────────────────────
+chromadb>=0.5.0             # Local vector store — no cloud, no signup required
+langchain-text-splitters>=0.2.0  # Text splitting utilities
+
+# ── Embeddings (local, free — no API key needed) ─────────────────────────────
+sentence-transformers>=2.7.0  # HuggingFace all-MiniLM-L6-v2 embedding model
+langchain-huggingface>=0.0.3  # Updated HuggingFace integration for LangChain
+
+# ── Web UI ───────────────────────────────────────────────────────────────────
+streamlit>=1.35.0           # Interactive chat UI (runs in the browser)
+
+# ── PDF processing ───────────────────────────────────────────────────────────
+pypdf>=4.0.0                # Reads PDF pages for PyPDFLoader
+
+# ── Environment variable management ─────────────────────────────────────────
+python-dotenv>=1.0.0        # Loads ANTHROPIC_API_KEY from .env file
+
+# ── Anthropic SDK ────────────────────────────────────────────────────────────
+anthropic>=0.30.0           # Required by langchain-anthropic under the hood
