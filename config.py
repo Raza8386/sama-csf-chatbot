@@ -12,18 +12,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Anthropic credentials ───────────────────────────────────────────────────
-# Check .env first (local), then Streamlit secrets (cloud deployment).
-# If neither is set, the app will ask the user to enter their key in the sidebar.
+# Reads from .env file (local). On Streamlit Cloud, users enter their key
+# in the sidebar — so None here is fine, app.py handles the missing key.
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-
-if not ANTHROPIC_API_KEY:
-    try:
-        import streamlit as st
-        ANTHROPIC_API_KEY = st.secrets.get("ANTHROPIC_API_KEY")
-    except Exception:
-        pass
-
-# No error raised here — app.py handles the missing key via the sidebar input
 
 # ── Model settings ──────────────────────────────────────────────────────────
 # Embedding model — uses HuggingFace sentence-transformers (free, runs locally)
