@@ -78,16 +78,20 @@ def build_rag_chain(vector_store: Chroma, top_k: int) -> tuple:
     """
     Build a retriever + LLM + prompt using modern LCEL (LangChain Expression Language).
     Returns a (retriever, llm, prompt) tuple — no deprecated langchain.chains needed.
+    Uses user-provided API key from session state if available, falls back to config.
     """
     retriever = vector_store.as_retriever(
         search_type="similarity",
         search_kwargs={"k": top_k},
     )
 
+    # Use key from sidebar input if provided, otherwise fall back to config/env
+    api_key = st.session_state.get("api_key") or ANTHROPIC_API_KEY
+
     llm = ChatAnthropic(
         model=LLM_MODEL,
         temperature=0,
-        anthropic_api_key=ANTHROPIC_API_KEY,
+        anthropic_api_key=api_key,
     )
 
     prompt = ChatPromptTemplate.from_template(SYSTEM_PROMPT)
@@ -136,6 +140,22 @@ def render_sidebar(vector_store) -> tuple[list[str], bool, int]:
             "An AI-powered compliance advisor trained on the "
             "**SAMA Cyber Security Framework**."
         )
+        st.divider()
+
+        # ── API Key input ─────────────────────────────────────────────────────
+        st.subheader("🔑 Anthropic API Key")
+        user_api_key = st.text_input(
+            "Enter your Anthropic API key:",
+            type="password",
+            placeholder="sk-ant-...",
+            help="Get your free key at https://console.anthropic.com/settings/keys",
+        )
+        if user_api_key:
+            st.session_state.api_key = user_api_key
+            st.success("✅ API key set")
+        elif "api_key" not in st.session_state:
+            st.warning("⚠️ Enter your Anthropic API key to start")
+
         st.divider()
 
         # ── Database status indicator ─────────────────────────────────────────
@@ -392,6 +412,11 @@ def main():
 
     # Build the RAG chain (rebuilt only when top_k changes)
     rag_chain = build_rag_chain(vector_store, top_k)
+
+    # ── Guard: require API key ────────────────────────────────────────────────
+    if not st.session_state.get("api_key") and not ANTHROPIC_API_KEY:
+        st.info("👈 Enter your **Anthropic API key** in the sidebar to start chatting.")
+        st.stop()
 
     # ── Render existing conversation ──────────────────────────────────────────
     render_chat_history()
