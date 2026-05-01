@@ -39,8 +39,8 @@ try:
         PDF_SOURCES,
         SYSTEM_PROMPT,
     )
-except EnvironmentError as env_err:
-    st.error(str(env_err))
+except Exception as err:
+    st.error(f"**Startup error:** {type(err).__name__}: {err}")
     st.stop()
 
 # ── LangChain imports ─────────────────────────────────────────────────────────
