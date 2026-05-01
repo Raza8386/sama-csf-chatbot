@@ -12,7 +12,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Anthropic credentials ───────────────────────────────────────────────────
-# Check .env first (local), then Streamlit secrets (cloud deployment)
+# Check .env first (local), then Streamlit secrets (cloud deployment).
+# If neither is set, the app will ask the user to enter their key in the sidebar.
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 if not ANTHROPIC_API_KEY:
@@ -22,13 +23,7 @@ if not ANTHROPIC_API_KEY:
     except Exception:
         pass
 
-if not ANTHROPIC_API_KEY:
-    raise EnvironmentError(
-        "\n\n❌  ANTHROPIC_API_KEY is not set.\n"
-        "Please create a .env file in the sama_chatbot/ folder with:\n\n"
-        "    ANTHROPIC_API_KEY=sk-ant-...\n\n"
-        "Get your key at: https://console.anthropic.com/settings/keys\n"
-    )
+# No error raised here — app.py handles the missing key via the sidebar input
 
 # ── Model settings ──────────────────────────────────────────────────────────
 # Embedding model — uses HuggingFace sentence-transformers (free, runs locally)
