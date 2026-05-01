@@ -1,122 +1,127 @@
-# SAMA CSF Compliance Chatbot
+# 🛡️ SAMA CSF Compliance Assistant
 
-An AI-powered compliance assistant that answers questions about the **SAMA Cyber Security Framework** using Retrieval Augmented Generation (RAG). Answers are grounded directly in the official PDF — no hallucination.
+An AI-powered compliance chatbot that answers questions about the **SAMA Cyber Security Framework (CSF)** using Retrieval Augmented Generation (RAG). Answers are grounded directly in the official SAMA CSF PDF — no hallucination, no guessing.
+
+🌐 **Live Demo:** [sama-csf-chatbot.streamlit.app](https://sama-csf-chatbot-hx8aqfwx3appqe9qsh366x7.streamlit.app)
 
 ---
 
-## How it works
+## 📸 Features
+
+- ✅ **RAG-powered answers** grounded in the official SAMA CSF document
+- ✅ **Claude AI** (Anthropic `claude-haiku-4-5`) for structured compliance responses
+- ✅ **Local embeddings** via HuggingFace `all-MiniLM-L6-v2` — free, no API cost
+- ✅ **ChromaDB** vector database for fast semantic search
+- ✅ **Domain filter** — focus queries on specific SAMA CSF domains
+- ✅ **Source pages** — see exactly which PDF pages backed each answer
+- ✅ **Confidence indicator** — High / Medium / Low based on retrieved chunks
+- ✅ **Streamlit UI** — clean, interactive chat interface
+- ✅ **Publicly deployed** on Streamlit Community Cloud
+
+---
+
+## 🚀 Try it online
+
+Visit the live app — no installation needed:
+
+**👉 [https://sama-csf-chatbot-hx8aqfwx3appqe9qsh366x7.streamlit.app](https://sama-csf-chatbot-hx8aqfwx3appqe9qsh366x7.streamlit.app)**
+
+1. Enter your **Anthropic API key** in the sidebar (get one free at [console.anthropic.com](https://console.anthropic.com/settings/keys))
+2. Ask any SAMA CSF compliance question
+3. Get a structured answer with source page references
+
+---
+
+## 🏗️ How it works
 
 ```
-Your question
-    ↓
-ChromaDB retrieves the 5 most relevant PDF chunks
-    ↓
-GPT-4o reads those chunks + your question
-    ↓
+Your compliance question
+        ↓
+ChromaDB retrieves the 5 most relevant SAMA CSF chunks
+        ↓
+Claude (claude-haiku-4-5) reads those chunks + your question
+        ↓
 Structured compliance answer + source page references
 ```
 
 ---
 
-## Prerequisites
+## 🖥️ Run locally
+
+### Prerequisites
 
 | Requirement | Version | Notes |
 |---|---|---|
 | Python | 3.10 or higher | Check with `python --version` |
-| OpenAI API key | Any tier | ~$0.01–0.05 per conversation |
+| Anthropic API key | Any tier | Free at [console.anthropic.com](https://console.anthropic.com/settings/keys) |
 | SAMA CSF PDF | Latest version | Free download from SAMA website |
 
 ---
 
-## Step-by-step setup
+### Step 1 — Clone the repository
 
-### 1. Download the SAMA CSF PDF
-
-1. Visit the Saudi Central Bank (SAMA) rules and instructions page:  
-   **https://www.sama.gov.sa/en-US/RulesInstructions/**
-2. Under the Cyber Security section, download the **SAMA Cyber Security Framework**
-3. Rename the file to exactly: `sama_csf.pdf`
-4. Place it inside the `sama_chatbot/` folder (the same folder as `app.py`)
-
-> Alternatively, search Google for: **"SAMA Cyber Security Framework PDF site:sama.gov.sa"**
-
----
-
-### 2. Get an OpenAI API key
-
-1. Sign in or create an account at **https://platform.openai.com/**
-2. Go to **API Keys** (top-right menu → "View API Keys")
-3. Click **"Create new secret key"**
-4. Copy the key — it starts with `sk-...`
-5. Add a small credit balance (Settings → Billing → Add payment method)  
-   *(The chatbot costs roughly $0.01–0.05 per session)*
-
----
-
-### 3. Create your `.env` file
-
-In the `sama_chatbot/` folder, create a file named `.env`:
-
-**Windows (Command Prompt):**
-```cmd
-copy .env.example .env
+```bash
+git clone https://github.com/Raza8386/sama-csf-chatbot.git
+cd sama-csf-chatbot/sama_chatbot
 ```
 
-**Mac / Linux:**
+---
+
+### Step 2 — Download the SAMA CSF PDF
+
+1. Visit: **https://www.sama.gov.sa/en-US/RulesInstructions/**
+2. Search for **Cyber Security Framework** and download the PDF
+3. Rename it to exactly: `sama_csf.pdf`
+4. Place it in the `sama_chatbot/` folder
+
+---
+
+### Step 3 — Get an Anthropic API key
+
+1. Go to **https://console.anthropic.com/settings/keys**
+2. Click **Create key**
+3. Copy the key — it starts with `sk-ant-...`
+
+---
+
+### Step 4 — Create your `.env` file
+
 ```bash
+# Windows
+copy .env.example .env
+
+# Mac / Linux
 cp .env.example .env
 ```
 
-Open `.env` with any text editor and replace `your-openai-api-key-here` with your real key:
+Open `.env` and add your key:
 
 ```
-OPENAI_API_KEY=sk-proj-abc123...
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 > ⚠️ Never share your `.env` file or commit it to Git.
 
 ---
 
-### 4. Create a Python virtual environment (recommended)
-
-```bash
-# Navigate to the project folder
-cd "sama_chatbot"
-
-# Create a virtual environment
-python -m venv venv
-
-# Activate it
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
-```
-
----
-
-### 5. Install dependencies
+### Step 5 — Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-This installs LangChain, ChromaDB, Streamlit, and all other required packages.  
-Expect 2–5 minutes on first install.
-
 ---
 
-### 6. Index the SAMA CSF PDF (run once)
+### Step 6 — Index the SAMA CSF PDF (run once)
 
 ```bash
 python index_docs.py
 ```
 
-This script:
-- Reads `sama_csf.pdf` page by page
-- Splits it into ~1,000-character chunks
-- Embeds each chunk using OpenAI (`text-embedding-3-small`)
-- Saves everything to a local folder called `sama_db/`
+This will:
+- Load and split the PDF into chunks
+- Download the `all-MiniLM-L6-v2` embedding model (~90 MB, one-time)
+- Save the vector database to `sama_db/`
 
 **Expected output:**
 ```
@@ -124,9 +129,9 @@ This script:
   SAMA CSF Document Indexer
 ============================================================
 📄  Loading PDF: sama_csf.pdf
-    ✔  Loaded 82 pages from PDF
-    ✔  Split into 347 chunks (size=1000, overlap=150)
-🔢  Creating embeddings with model: text-embedding-3-small
+    ✔  Loaded 56 pages from PDF
+    ✔  Split into 171 chunks (size=1000, overlap=150)
+🔢  Creating embeddings with model: all-MiniLM-L6-v2
 💾  Saving vector store to: ./sama_db
     ✔  Vector store saved at: ./sama_db
 ============================================================
@@ -134,23 +139,19 @@ This script:
 ============================================================
 ```
 
-*You only need to run this once.* The `sama_db/` folder persists between sessions.
-
 ---
 
-### 7. Launch the chatbot
+### Step 7 — Launch the chatbot
 
 ```bash
-streamlit run app.py
+python -m streamlit run app.py
 ```
 
-The app opens automatically in your browser at **http://localhost:8501**
+Open your browser at **http://localhost:8501**
 
 ---
 
-## Example questions to test
-
-Try these after the app loads:
+## 💬 Example questions
 
 - *"What are the maturity level 3 requirements for cybersecurity governance?"*
 - *"What does SAMA CSF require for vulnerability management?"*
@@ -163,79 +164,109 @@ Try these after the app loads:
 
 ---
 
-## Project structure
+## 📁 Project structure
 
 ```
 sama_chatbot/
-├── app.py            ← Streamlit chatbot UI (main entry point)
-├── index_docs.py     ← One-time PDF indexing script
-├── config.py         ← All settings in one place
-├── requirements.txt  ← Python dependencies
-├── .env.example      ← Template for environment variables
-├── .env              ← Your actual API key (not committed to Git)
-├── sama_csf.pdf      ← SAMA CSF PDF (you add this)
-└── sama_db/          ← ChromaDB vector index (auto-created by index_docs.py)
+├── app.py              ← Streamlit chatbot UI (main entry point)
+├── index_docs.py       ← One-time PDF indexing script
+├── config.py           ← All settings in one place
+├── requirements.txt    ← Python dependencies
+├── .env.example        ← Template for environment variables
+├── .env                ← Your actual API key (not committed to Git)
+├── .streamlit/
+│   └── config.toml     ← Streamlit server settings
+├── sama_csf.pdf        ← SAMA CSF PDF
+└── sama_db/            ← ChromaDB vector index (auto-created)
 ```
 
 ---
 
-## Troubleshooting
+## ⚙️ Configuration
 
-### `❌ OPENAI_API_KEY is not set`
-- Check that `.env` exists in the `sama_chatbot/` folder (not `.env.example`)
-- Verify the key is on its own line: `OPENAI_API_KEY=sk-...`
-- Make sure there are no spaces around the `=` sign
-
-### `❌ PDF not found: sama_csf.pdf`
-- Confirm the file is in the same folder as `index_docs.py`
-- Confirm the filename is exactly `sama_csf.pdf` (lowercase, no spaces)
-
-### `🔴 Knowledge base not loaded` in the app
-- You haven't run `python index_docs.py` yet, or it failed
-- Run `python index_docs.py` and wait for the "Indexing Complete" message
-- Then restart the Streamlit app
-
-### `ModuleNotFoundError: No module named 'langchain'`
-- Your virtual environment is not activated, or dependencies weren't installed
-- Run `pip install -r requirements.txt` again with the venv active
-
-### App is slow on first load
-- ChromaDB loads into memory on first query — this is normal (5–10 seconds)
-- Subsequent queries are much faster
-
-### OpenAI API error: `AuthenticationError`
-- Your API key is invalid or has been revoked
-- Generate a new key at https://platform.openai.com/api-keys
-
-### OpenAI API error: `RateLimitError` or `InsufficientQuotaError`
-- Add credit to your OpenAI account at https://platform.openai.com/settings/billing
-
----
-
-## Configuration
-
-All settings are in `config.py`. You can change:
+All settings are in `config.py`:
 
 | Setting | Default | Description |
 |---|---|---|
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
-| `LLM_MODEL` | `gpt-4o` | OpenAI chat model |
+| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | HuggingFace local embedding model |
+| `LLM_MODEL` | `claude-haiku-4-5` | Anthropic Claude model |
 | `CHUNK_SIZE` | `1000` | Characters per chunk |
-| `CHUNK_OVERLAP` | `150` | Overlap between chunks |
+| `CHUNK_OVERLAP` | `150` | Overlap between adjacent chunks |
 | `TOP_K_RESULTS` | `5` | Chunks retrieved per query |
 
-If you change `CHUNK_SIZE` or `CHUNK_OVERLAP`, re-run `python index_docs.py` to rebuild the index.
+> If you change `CHUNK_SIZE` or `CHUNK_OVERLAP`, re-run `python index_docs.py` to rebuild the index.
 
 ---
 
-## Cost estimate
+## 🔍 SAMA CSF Domains covered
+
+- Cybersecurity Leadership and Governance
+- Cybersecurity Risk Management
+- Cybersecurity Operations and Technology
+- Third-Party Cybersecurity
+- Cybersecurity Resilience
+- Application Security
+- Data and Cloud Security
+- Industrial Systems Security
+
+---
+
+## 🛠️ Troubleshooting
+
+### `❌ ANTHROPIC_API_KEY is not set`
+- Check that `.env` exists in the `sama_chatbot/` folder
+- Verify the key is on its own line: `ANTHROPIC_API_KEY=sk-ant-...`
+- No spaces around the `=` sign
+
+### `❌ PDF not found: sama_csf.pdf`
+- Confirm the file is in the same folder as `index_docs.py`
+- Filename must be exactly `sama_csf.pdf` (lowercase, no spaces)
+
+### `🔴 Knowledge base not loaded`
+- Run `python index_docs.py` first and wait for "Indexing Complete"
+- Then restart the Streamlit app
+
+### `ModuleNotFoundError`
+- Run `pip install -r requirements.txt` again
+- Make sure your virtual environment is activated
+
+### `invalid x-api-key` error
+- Your Anthropic API key is invalid or expired
+- Create a new key at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+
+---
+
+## 💰 Cost estimate
 
 | Operation | Cost |
 |---|---|
-| Indexing (one-time, ~350 chunks) | ~$0.002 |
-| Per question (retrieval + GPT-4o) | ~$0.01–0.05 |
-| 100 questions/month | ~$1–5 |
+| Indexing (one-time, 171 chunks) | **Free** — local embeddings |
+| Per question (Claude Haiku) | ~$0.001–0.005 |
+| 100 questions/month | ~$0.10–0.50 |
+
+> Embeddings are completely free — they run locally on your machine using HuggingFace sentence-transformers.
 
 ---
 
-*Built with LangChain · ChromaDB · OpenAI · Streamlit*
+## 🧰 Tech stack
+
+| Component | Technology |
+|---|---|
+| LLM | Anthropic Claude (`claude-haiku-4-5`) |
+| Embeddings | HuggingFace `all-MiniLM-L6-v2` (local, free) |
+| Vector DB | ChromaDB (local) |
+| RAG Framework | LangChain |
+| UI | Streamlit |
+| Deployment | Streamlit Community Cloud |
+
+---
+
+## 👤 Author
+
+**Danish Raza** — GRC Professional  
+📧 danishraza786@gmail.com  
+🔗 [github.com/Raza8386](https://github.com/Raza8386)
+
+---
+
+*Built with LangChain · ChromaDB · Anthropic Claude · HuggingFace · Streamlit*
