@@ -44,10 +44,17 @@ except Exception as err:
     st.stop()
 
 # ── LangChain imports ─────────────────────────────────────────────────────────
-from langchain_anthropic import ChatAnthropic
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_core.prompts import ChatPromptTemplate
+try:
+    from langchain_anthropic import ChatAnthropic
+    from langchain_community.vectorstores import Chroma
+    from langchain_core.prompts import ChatPromptTemplate
+    try:
+        from langchain_huggingface import HuggingFaceEmbeddings
+    except ImportError:
+        from langchain_community.embeddings import HuggingFaceEmbeddings
+except Exception as import_err:
+    st.error(f"**Package import error:** {type(import_err).__name__}: {import_err}")
+    st.stop()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
