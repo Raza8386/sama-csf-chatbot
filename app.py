@@ -35,6 +35,8 @@ try:
         CHROMA_DB_PATH,
         COLLECTION_NAME,
         SAMA_DOMAINS,
+        FRAMEWORK_DOMAINS,
+        PDF_SOURCES,
         SYSTEM_PROMPT,
     )
 except EnvironmentError as env_err:
@@ -74,15 +76,24 @@ def load_vector_store():
     return vector_store
 
 
-def build_rag_chain(vector_store: Chroma, top_k: int) -> tuple:
+def build_rag_chain(vector_store: Chroma, top_k: int, selected_framework: str) -> tuple:
     """
-    Build a retriever + LLM + prompt using modern LCEL (LangChain Expression Language).
-    Returns a (retriever, llm, prompt) tuple — no deprecated langchain.chains needed.
-    Uses user-provided API key from session state if available, falls back to config.
+    Build a retriever + LLM + prompt using modern LCEL.
+    Filters ChromaDB by framework metadata when a specific framework is selected.
+    Returns a (retriever, llm, prompt) tuple.
     """
+    # Apply metadata filter when a specific framework is chosen
+    if selected_framework and selected_framework != "All Frameworks":
+        search_kwargs = {
+            "k": top_k,
+            "filter": {"framework": selected_framework},
+        }
+    else:
+        search_kwargs = {"k": top_k}
+
     retriever = vector_store.as_retriever(
         search_type="similarity",
-        search_kwargs={"k": top_k},
+        search_kwargs=search_kwargs,
     )
 
     # Use key from sidebar input if provided, otherwise fall back to config/env
@@ -126,19 +137,20 @@ def initialise_session_state():
 #  Sidebar
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def render_sidebar(vector_store) -> tuple[list[str], bool, int]:
+def render_sidebar(vector_store) -> tuple[str, list[str], bool, int]:
     """
     Render the left sidebar and return the user's current selections:
-      - selected_domains: list of SAMA CSF domains to focus on
+      - selected_framework: framework to filter by (or "All Frameworks")
+      - selected_domains: list of domains to focus on
       - show_sources: whether to display source chunks below each answer
       - top_k: number of chunks to retrieve
     """
     with st.sidebar:
         # ── App branding ──────────────────────────────────────────────────────
-        st.markdown("## 🛡️ SAMA CSF Assistant")
+        st.markdown("## 🛡️ GRC Compliance Assistant")
         st.markdown(
-            "An AI-powered compliance advisor trained on the "
-            "**SAMA Cyber Security Framework**."
+            "An AI-powered compliance advisor trained on multiple "
+            "**Saudi regulatory frameworks**."
         )
         st.divider()
 
@@ -164,7 +176,6 @@ def render_sidebar(vector_store) -> tuple[list[str], bool, int]:
         else:
             st.markdown("**Database status:** 🔴 Not indexed yet")
 
-        # ── Session statistics ────────────────────────────────────────────────
         st.markdown(
             f"**Questions asked this session:** {st.session_state.question_count}"
         )
@@ -174,22 +185,36 @@ def render_sidebar(vector_store) -> tuple[list[str], bool, int]:
         with st.expander("ℹ️ About this tool"):
             st.markdown(
                 """
-                This chatbot uses **Retrieval Augmented Generation (RAG)** to
-                answer compliance questions directly from the SAMA CSF document.
+                This chatbot uses **RAG (Retrieval Augmented Generation)** to
+                answer compliance questions from multiple regulatory frameworks.
 
-                - Answers are grounded in the actual PDF — no hallucination
-                - Source pages are shown below each answer
-                - Use domain filters to focus your query
+                - Answers grounded in official PDFs — no hallucination
+                - Source pages shown below each answer
+                - Filter by framework and domain
                 """
             )
 
-        st.subheader("🔍 Domain Filter")
-        st.caption("Optionally narrow the question to specific domains (leave blank for all).")
+        # ── Framework selector ────────────────────────────────────────────────
+        st.subheader("📚 Framework")
+        framework_options = ["All Frameworks"] + list(PDF_SOURCES.keys())
+        selected_framework = st.selectbox(
+            "Select a framework:",
+            options=framework_options,
+            help="Filter answers to a specific regulatory framework.",
+        )
 
-        # Multi-select populated from config.py SAMA_DOMAINS list
+        # ── Domain filter (changes based on selected framework) ───────────────
+        st.subheader("🔍 Domain Filter")
+        st.caption("Optionally narrow to specific domains (leave blank for all).")
+
+        if selected_framework == "All Frameworks":
+            domain_options = SAMA_DOMAINS
+        else:
+            domain_options = FRAMEWORK_DOMAINS.get(selected_framework, [])
+
         selected_domains = st.multiselect(
-            label="Focus on these SAMA CSF domains:",
-            options=SAMA_DOMAINS,
+            label="Focus on these domains:",
+            options=domain_options,
             default=[],
             placeholder="All domains (no filter)",
         )
@@ -202,7 +227,7 @@ def render_sidebar(vector_store) -> tuple[list[str], bool, int]:
         show_sources = st.toggle(
             "Show source documents",
             value=True,
-            help="Display the raw PDF chunks that were used to generate the answer.",
+            help="Display the raw PDF chunks used to generate the answer.",
         )
 
         top_k = st.slider(
@@ -210,8 +235,17 @@ def render_sidebar(vector_store) -> tuple[list[str], bool, int]:
             min_value=3,
             max_value=10,
             value=TOP_K_RESULTS,
-            help="More chunks = more context for the LLM but slightly slower response.",
+            help="More chunks = more context but slightly slower response.",
         )
+
+        st.divider()
+
+        # ── Suggested questions (always visible, changes with framework) ────────
+        st.subheader("💡 Suggested Questions")
+        questions = STARTER_QUESTIONS.get(selected_framework, STARTER_QUESTIONS["All Frameworks"])
+        for i, q in enumerate(questions):
+            if st.button(q, use_container_width=True, key=f"sidebar_q_{selected_framework}_{i}"):
+                st.session_state.sidebar_question = q
 
         st.divider()
 
@@ -220,32 +254,55 @@ def render_sidebar(vector_store) -> tuple[list[str], bool, int]:
             st.session_state.messages = []
             st.session_state.question_count = 0
             st.session_state.active_domains = []
+            st.session_state.pop("sidebar_question", None)
             st.rerun()
 
-    return selected_domains, show_sources, top_k
+    return selected_framework, selected_domains, show_sources, top_k
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Starter question chips
 # ═══════════════════════════════════════════════════════════════════════════════
 
-STARTER_QUESTIONS = [
-    "What are the maturity level 3 requirements for cybersecurity governance?",
-    "What does SAMA CSF require for vulnerability management?",
-    "How should third-party cybersecurity risk be managed?",
-    "What are the incident response requirements?",
-]
+STARTER_QUESTIONS = {
+    "SAMA CSF": [
+        "What are the maturity level 3 requirements for cybersecurity governance?",
+        "What does SAMA CSF require for vulnerability management?",
+        "How should third-party cybersecurity risk be managed?",
+        "What are the incident response requirements?",
+    ],
+    "PDPL": [
+        "What are the data subject rights under PDPL?",
+        "What are the requirements for cross-border data transfers under PDPL?",
+        "When is consent required for processing personal data?",
+        "What are the breach notification obligations under PDPL?",
+    ],
+    "NCA ECC": [
+        "What are the essential cybersecurity controls for identity management?",
+        "What does NCA ECC require for cybersecurity governance?",
+        "What are the asset management requirements in NCA ECC?",
+        "How should cybersecurity incidents be handled under NCA ECC?",
+    ],
+    "All Frameworks": [
+        "What are the incident response requirements?",
+        "How should third-party risk be managed?",
+        "What are the data protection obligations?",
+        "What cybersecurity governance controls are required?",
+    ],
+}
 
 
-def render_starter_chips() -> str | None:
+def render_starter_chips(selected_framework: str) -> str | None:
     """
-    Show clickable question chips when the chat is empty.
+    Show clickable question chips relevant to the selected framework.
     Returns the selected question text, or None if none was clicked.
     """
     st.markdown("#### 💡 Suggested questions — click to ask:")
 
+    questions = STARTER_QUESTIONS.get(selected_framework, STARTER_QUESTIONS["All Frameworks"])
+
     cols = st.columns(2)
-    for index, question in enumerate(STARTER_QUESTIONS):
+    for index, question in enumerate(questions):
         col = cols[index % 2]
         with col:
             if st.button(question, use_container_width=True, key=f"starter_{index}"):
@@ -309,6 +366,7 @@ def render_chat_history():
 def ask_question(
     rag_chain: tuple,
     user_question: str,
+    selected_framework: str,
     selected_domains: list[str],
     show_sources: bool,
 ):
@@ -318,12 +376,15 @@ def ask_question(
     """
     retriever, llm, prompt = rag_chain
 
-    # Append domain context to the question when a filter is active
+    # Build augmented question with framework and domain hints
+    hints = []
+    if selected_framework and selected_framework != "All Frameworks":
+        hints.append(f"Framework: {selected_framework}")
     if selected_domains:
-        domain_hint = ", ".join(selected_domains)
-        augmented_question = (
-            f"[Focus on these SAMA CSF domains: {domain_hint}]\n\n{user_question}"
-        )
+        hints.append(f"Domains: {', '.join(selected_domains)}")
+
+    if hints:
+        augmented_question = f"[{' | '.join(hints)}]\n\n{user_question}"
     else:
         augmented_question = user_question
 
@@ -388,11 +449,11 @@ def main():
     vector_store = load_vector_store()
 
     # Render sidebar and capture the user's filter/option selections
-    selected_domains, show_sources, top_k = render_sidebar(vector_store)
+    selected_framework, selected_domains, show_sources, top_k = render_sidebar(vector_store)
 
     # ── Main area header ──────────────────────────────────────────────────────
-    st.title("🛡️ SAMA CSF Compliance Assistant")
-    st.caption("Powered by your SAMA CSF documents · Answers grounded in the official framework")
+    st.title("🛡️ GRC Compliance Assistant")
+    st.caption("Powered by SAMA CSF · PDPL · and more — answers grounded in official frameworks")
     st.divider()
 
     # ── Guard: show warning if ChromaDB hasn't been indexed yet ───────────────
@@ -410,8 +471,8 @@ def main():
         )
         st.stop()
 
-    # Build the RAG chain (rebuilt only when top_k changes)
-    rag_chain = build_rag_chain(vector_store, top_k)
+    # Build the RAG chain (rebuilt when top_k or framework changes)
+    rag_chain = build_rag_chain(vector_store, top_k, selected_framework)
 
     # ── Guard: require API key ────────────────────────────────────────────────
     if not st.session_state.get("api_key") and not ANTHROPIC_API_KEY:
@@ -421,20 +482,24 @@ def main():
     # ── Render existing conversation ──────────────────────────────────────────
     render_chat_history()
 
-    # ── Starter question chips (shown only when chat is empty) ───────────────
-    starter_question = None
+    # ── Starter chips in main area (only when chat is empty) ─────────────────
     if not st.session_state.messages:
-        starter_question = render_starter_chips()
+        render_starter_chips(selected_framework)
 
-    # ── Chat input box at the bottom ─────────────────────────────────────────
-    typed_question = st.chat_input("Ask a SAMA CSF compliance question...")
+    # ── Chat input box — placeholder changes with selected framework ──────────
+    if selected_framework == "All Frameworks":
+        placeholder = "Ask a compliance question across all frameworks..."
+    else:
+        placeholder = f"Ask a {selected_framework} compliance question..."
 
-    # Determine which question to process: typed input takes priority over chip click
-    active_question = typed_question or starter_question
+    typed_question = st.chat_input(placeholder)
+
+    # Sidebar question button takes priority, then typed input
+    sidebar_question = st.session_state.pop("sidebar_question", None)
+    active_question = typed_question or sidebar_question
 
     if active_question:
-        ask_question(rag_chain, active_question, selected_domains, show_sources)
-        # Rerun to update the question counter in the sidebar
+        ask_question(rag_chain, active_question, selected_framework, selected_domains, show_sources)
         st.rerun()
 
 

@@ -1,22 +1,21 @@
 """
-index_docs.py - One-time script to load the SAMA CSF PDF into ChromaDB
+index_docs.py - Index one or more compliance framework PDFs into ChromaDB
 
-Run this ONCE before starting the chatbot:
+Run this ONCE (or whenever you add a new framework PDF):
     python index_docs.py
 
 What it does:
-  1. Checks that sama_csf.pdf exists
-  2. Asks whether to skip if a database already exists
-  3. Reads and splits the PDF into chunks
-  4. Embeds each chunk using OpenAI
-  5. Saves everything to a local ChromaDB folder (./sama_db)
+  1. Checks which framework PDFs are present in the folder
+  2. Loads and splits each PDF into chunks
+  3. Tags every chunk with its framework name (e.g. "SAMA CSF", "PDPL")
+  4. Embeds all chunks using a local HuggingFace model (free, no API)
+  5. Saves everything to a single ChromaDB collection (./sama_db)
 """
 
 import os
 import sys
 
 # ── Config import ────────────────────────────────────────────────────────────
-# All settings (paths, models, chunk sizes) come from config.py
 try:
     from config import (
         ANTHROPIC_API_KEY,
@@ -25,10 +24,9 @@ try:
         CHUNK_OVERLAP,
         CHROMA_DB_PATH,
         COLLECTION_NAME,
-        PDF_PATH,
+        PDF_SOURCES,
     )
 except EnvironmentError as env_err:
-    # config.py raises a clear error if ANTHROPIC_API_KEY is missing
     print(env_err)
     sys.exit(1)
 
@@ -39,35 +37,47 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 
 
-def check_pdf_exists(pdf_path: str) -> bool:
-    """Verify the SAMA CSF PDF is present. Print download instructions if not."""
-    if os.path.isfile(pdf_path):
-        return True
+def find_available_pdfs() -> dict:
+    """
+    Check which framework PDFs from PDF_SOURCES are actually present.
+    Returns only the ones found on disk.
+    """
+    available = {}
+    missing = []
 
-    print("\n❌  PDF not found:", pdf_path)
-    print("\nTo download the SAMA Cyber Security Framework:")
-    print("  1. Visit https://www.sama.gov.sa/en-US/RulesInstructions/")
-    print("  2. Search for 'Cyber Security Framework'")
-    print("  3. Download the PDF and rename it to 'sama_csf.pdf'")
-    print("  4. Place it in the sama_chatbot/ folder (same folder as this script)")
-    print("\nAlternatively, search Google for: 'SAMA Cyber Security Framework PDF'\n")
-    return False
+    print("\n📋  Checking for framework PDFs...")
+    for framework, filename in PDF_SOURCES.items():
+        if os.path.isfile(filename):
+            available[framework] = filename
+            print(f"    ✔  Found: {filename}  ({framework})")
+        else:
+            missing.append((framework, filename))
+            print(f"    ⚠️  Missing: {filename}  ({framework})")
+
+    if missing:
+        print("\n💡  To add missing frameworks, download the PDF and place it here:")
+        for framework, filename in missing:
+            print(f"       {filename}  ←  {framework}")
+
+    if not available:
+        print("\n❌  No PDFs found. Please add at least one framework PDF.")
+        sys.exit(1)
+
+    return available
 
 
 def check_existing_database(db_path: str) -> bool:
     """
-    Check if a ChromaDB database already exists at the configured path.
+    Check if a ChromaDB database already exists.
     Ask the user whether to re-index or skip.
-    Returns True if we should proceed with indexing, False to skip.
+    Returns True to proceed with indexing, False to skip.
     """
-    # ChromaDB creates a 'chroma.sqlite3' file when it initialises
     sqlite_file = os.path.join(db_path, "chroma.sqlite3")
 
     if not os.path.exists(sqlite_file):
-        # No existing database — safe to create fresh
         return True
 
-    print(f"\n⚠️  An existing ChromaDB database was found at: {db_path}")
+    print(f"\n⚠️  Existing database found at: {db_path}")
     print("Options:")
     print("  [1] Re-index (overwrites the existing database)")
     print("  [2] Skip indexing (use the existing database as-is)")
@@ -84,52 +94,51 @@ def check_existing_database(db_path: str) -> bool:
             print("Please enter 1 or 2.")
 
 
-def load_and_split_pdf(pdf_path: str) -> list:
+def load_and_split_pdf(framework: str, pdf_path: str) -> list:
     """
-    Load the PDF with PyPDFLoader (one Document per page) then split
-    each page into smaller overlapping chunks for better retrieval accuracy.
+    Load a PDF and split into overlapping chunks.
+    Each chunk is tagged with its framework name in metadata.
     """
-    print(f"\n📄  Loading PDF: {pdf_path}")
+    print(f"\n📄  Loading: {pdf_path}  [{framework}]")
     loader = PyPDFLoader(pdf_path)
-
-    # Load returns a list of Document objects (one per PDF page)
     pages = loader.load()
-    print(f"    ✔  Loaded {len(pages)} pages from PDF")
+    print(f"    ✔  Loaded {len(pages)} pages")
 
-    # Split pages into smaller chunks so the LLM receives focused context
+    # Tag every page with its framework so we can filter later
+    for page in pages:
+        page.metadata["framework"] = framework
+
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
-        # Try to split on paragraph/sentence boundaries before cutting mid-word
         separators=["\n\n", "\n", ". ", " ", ""],
     )
 
     chunks = text_splitter.split_documents(pages)
-    print(f"    ✔  Split into {len(chunks)} chunks "
-          f"(size={CHUNK_SIZE}, overlap={CHUNK_OVERLAP})")
+
+    # Make sure the framework tag is on every chunk too
+    for chunk in chunks:
+        chunk.metadata["framework"] = framework
+
+    print(f"    ✔  Split into {len(chunks)} chunks")
     return chunks
 
 
-def build_vector_store(chunks: list) -> Chroma:
+def build_vector_store(all_chunks: list) -> Chroma:
     """
-    Embed each chunk using a local HuggingFace model and store in ChromaDB.
+    Embed all chunks using a local HuggingFace model and store in ChromaDB.
     Runs entirely on your machine — no API calls, no cost.
-    First run downloads the model (~90 MB); subsequent runs use the cache.
     """
     print(f"\n🔢  Creating embeddings with model: {EMBEDDING_MODEL}")
-    print("    Running locally via sentence-transformers (no API calls)...")
-    print("    First run will download the model (~90 MB) — please wait...")
+    print("    Running locally — no API calls, no cost.")
+    print("    First run downloads the model (~90 MB)...")
 
-    # Initialise the local HuggingFace embedding model
-    embeddings = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL,
-    )
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 
     print(f"\n💾  Saving vector store to: {CHROMA_DB_PATH}")
 
-    # Chroma.from_documents embeds all chunks and persists to disk in one call
     vector_store = Chroma.from_documents(
-        documents=chunks,
+        documents=all_chunks,
         embedding=embeddings,
         persist_directory=CHROMA_DB_PATH,
         collection_name=COLLECTION_NAME,
@@ -140,38 +149,43 @@ def build_vector_store(chunks: list) -> Chroma:
 
 
 def main():
-    """Main indexing workflow — runs all steps in order with clear status output."""
     print("=" * 60)
-    print("  SAMA CSF Document Indexer")
+    print("  GRC Compliance Framework Indexer")
     print("=" * 60)
 
-    # Step 1: Make sure the PDF is present
-    if not check_pdf_exists(PDF_PATH):
-        sys.exit(1)
+    # Step 1: Find which PDFs are available
+    available_pdfs = find_available_pdfs()
 
-    # Step 2: Check for an existing database and get user preference
+    # Step 2: Check for existing database
     should_index = check_existing_database(CHROMA_DB_PATH)
     if not should_index:
-        print("\n🚀  You can now launch the chatbot with:")
-        print("       streamlit run app.py\n")
+        print("\n🚀  Launch the chatbot with:")
+        print("       python -m streamlit run app.py\n")
         sys.exit(0)
 
-    # Step 3: Load and chunk the PDF
-    chunks = load_and_split_pdf(PDF_PATH)
+    # Step 3: Load and chunk all available PDFs
+    all_chunks = []
+    for framework, pdf_path in available_pdfs.items():
+        chunks = load_and_split_pdf(framework, pdf_path)
+        all_chunks.extend(chunks)
+
+    print(f"\n📦  Total chunks across all frameworks: {len(all_chunks)}")
 
     # Step 4: Embed and store in ChromaDB
-    vector_store = build_vector_store(chunks)
+    build_vector_store(all_chunks)
 
-    # Step 5: Print a summary so the user knows everything worked
+    # Step 5: Summary
     print("\n" + "=" * 60)
     print("  ✅  Indexing Complete!")
     print("=" * 60)
-    print(f"  📄  Pages loaded    : {len(chunks)} chunks created")
-    print(f"  📦  Storage location: {CHROMA_DB_PATH}")
-    print(f"  🗂️  Collection name : {COLLECTION_NAME}")
-    print(f"  🤖  Embedding model : {EMBEDDING_MODEL}")
+    for framework, pdf_path in available_pdfs.items():
+        print(f"  ✔  {framework}: {pdf_path}")
+    print(f"\n  📦  Total chunks  : {len(all_chunks)}")
+    print(f"  💾  Storage       : {CHROMA_DB_PATH}")
+    print(f"  🗂️  Collection    : {COLLECTION_NAME}")
+    print(f"  🤖  Embedding     : {EMBEDDING_MODEL}")
     print("\n  Next step — launch the chatbot:")
-    print("       streamlit run app.py\n")
+    print("       python -m streamlit run app.py\n")
 
 
 if __name__ == "__main__":

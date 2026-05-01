@@ -1,5 +1,5 @@
 """
-config.py - Central configuration for the SAMA CSF Compliance Chatbot
+config.py - Central configuration for the GRC Compliance Chatbot
 
 All settings live here. Edit this file to change models, paths, or chunking behavior.
 You should never need to touch app.py or index_docs.py to change these values.
@@ -32,59 +32,85 @@ if not ANTHROPIC_API_KEY:
 
 # ── Model settings ──────────────────────────────────────────────────────────
 # Embedding model — uses HuggingFace sentence-transformers (free, runs locally)
-# Anthropic does not provide an embedding API, so we use a local model instead.
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # LLM used to generate the compliance answer (Anthropic Claude)
 LLM_MODEL = "claude-haiku-4-5"
 
 # ── Document chunking settings ──────────────────────────────────────────────
-# Each PDF page is split into smaller overlapping chunks for better retrieval
 CHUNK_SIZE = 1000        # Max characters per chunk
-CHUNK_OVERLAP = 150      # Characters shared between adjacent chunks (preserves context at boundaries)
+CHUNK_OVERLAP = 150      # Characters shared between adjacent chunks
 
 # ── Retrieval settings ──────────────────────────────────────────────────────
-# How many chunks to fetch from ChromaDB per query (user can override in sidebar)
 TOP_K_RESULTS = 5
 
 # ── ChromaDB (local vector database) settings ───────────────────────────────
-# ChromaDB stores vectors on disk — no cloud, no signup required
-CHROMA_DB_PATH = "./sama_db"          # Folder where the vector index is saved
-COLLECTION_NAME = "sama_csf"          # Name of the collection inside ChromaDB
+CHROMA_DB_PATH = "./sama_db"
+COLLECTION_NAME = "grc_frameworks"
 
-# ── Source document path ────────────────────────────────────────────────────
-# Place your SAMA CSF PDF in the sama_chatbot/ folder with this exact filename
-PDF_PATH = "sama_csf.pdf"
+# ── Multi-framework PDF sources ─────────────────────────────────────────────
+# Add more frameworks here — key is the display name, value is the PDF filename.
+# Place all PDFs in the sama_chatbot/ folder.
+PDF_SOURCES = {
+    "SAMA CSF": "sama_csf.pdf",
+    "PDPL":     "pdpl.pdf",
+    "NCA ECC":  "nca_ecc.pdf",
+}
 
-# ── SAMA CSF Domain list ────────────────────────────────────────────────────
-# Used in the sidebar filter — these match the official framework structure
-SAMA_DOMAINS = [
-    "Cybersecurity Leadership and Governance",
-    "Cybersecurity Risk Management",
-    "Cybersecurity Operations and Technology",
-    "Third-Party Cybersecurity",
-    "Cybersecurity Resilience",
-    "Application Security",
-    "Data and Cloud Security",
-    "Industrial Systems Security",
-]
+# ── Framework domains ────────────────────────────────────────────────────────
+# Used in the sidebar domain filter, grouped by framework.
+FRAMEWORK_DOMAINS = {
+    "SAMA CSF": [
+        "Cybersecurity Leadership and Governance",
+        "Cybersecurity Risk Management",
+        "Cybersecurity Operations and Technology",
+        "Third-Party Cybersecurity",
+        "Cybersecurity Resilience",
+        "Application Security",
+        "Data and Cloud Security",
+        "Industrial Systems Security",
+    ],
+    "PDPL": [
+        "Data Collection and Processing",
+        "Personal Data Rights",
+        "Consent and Legal Basis",
+        "Data Retention and Destruction",
+        "Cross-border Data Transfers",
+        "Data Breach Notification",
+        "Data Protection Officer",
+        "Privacy Notice and Transparency",
+    ],
+    "NCA ECC": [
+        "Cybersecurity Governance",
+        "Cybersecurity Risk Management",
+        "Cybersecurity Operations",
+        "Third-Party and Cloud Security",
+        "Industrial Control Systems Security",
+        "Cybersecurity Resilience",
+        "Physical Security",
+        "Asset Management",
+        "Identity and Access Management",
+        "Information Protection",
+    ],
+}
+
+# Flat list of all domains (used when no framework filter is selected)
+SAMA_DOMAINS = [d for domains in FRAMEWORK_DOMAINS.values() for d in domains]
 
 # ── System prompt for the RAG chain ────────────────────────────────────────
-# This instructs the LLM to behave as a SAMA CSF compliance expert.
-# {context} and {question} are filled in automatically by LangChain.
-SYSTEM_PROMPT = """You are an expert SAMA Cyber Security Framework (CSF) compliance advisor with deep experience in GRC, cybersecurity auditing, and Saudi Arabian financial sector regulations.
+SYSTEM_PROMPT = """You are an expert GRC (Governance, Risk and Compliance) advisor specialising in Saudi Arabian regulations including the SAMA Cyber Security Framework (CSF), the Personal Data Protection Law (PDPL), and the NCA Essential Cybersecurity Controls (ECC). You have deep experience in cybersecurity auditing, data privacy compliance, and Saudi regulatory requirements.
 
-Answer the compliance question below using ONLY the provided SAMA CSF context sections. Structure your answer clearly with:
-- The relevant SAMA CSF domain and control reference
-- The specific requirement or control objective
-- The maturity level expectations if mentioned
+Answer the compliance question below using ONLY the provided context sections from the relevant framework document. Structure your answer clearly with:
+- The relevant framework name, domain, and control/article reference
+- The specific requirement or obligation
+- The maturity level or penalty implications if mentioned
 - Practical implementation guidance based on the framework
 
-If the answer is not found in the provided context, respond with: "This specific requirement does not appear in the SAMA CSF sections retrieved. Try rephrasing your question or ask about a related control domain."
+If the answer is not found in the provided context, respond with: "This specific requirement does not appear in the retrieved sections. Try rephrasing your question or selecting a different framework."
 
-Context from SAMA CSF document:
+Context from compliance framework document:
 {context}
 
 Compliance question: {question}
 
-Provide a structured, professional answer suitable for a cybersecurity auditor:"""
+Provide a structured, professional answer suitable for a GRC auditor or compliance officer:"""

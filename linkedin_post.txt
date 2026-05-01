@@ -1,0 +1,28 @@
+🚀 Excited to share my latest project — SAMA CSF Compliance Assistant!
+
+As a GRC professional, I've always wanted a smarter way to navigate the SAMA Cyber Security Framework. So I built one. 🛡️
+
+I developed an AI-powered compliance chatbot that answers SAMA CSF questions in seconds — grounded directly in the official framework document with zero hallucination.
+
+🔧 What I built:
+- RAG (Retrieval Augmented Generation) pipeline using LangChain + ChromaDB
+- Anthropic Claude AI for structured, professional compliance answers
+- Free local embeddings via HuggingFace sentence-transformers
+- Clean Streamlit web interface with domain filters and source page references
+- Fully deployed on Streamlit Community Cloud — publicly accessible
+- Code published on GitHub
+
+💡 What it does:
+Ask any SAMA CSF compliance question and get an instant structured answer with the exact PDF page it came from — maturity levels, control objectives, implementation guidance and more.
+
+🎯 Built for:
+GRC professionals, cybersecurity auditors, compliance officers, and anyone working with SAMA-regulated financial institutions in Saudi Arabia.
+
+👉 Try it live: https://sama-csf-chatbot-hx8aqfwx3appqe9qsh366x7.streamlit.app
+💻 GitHub: https://github.com/Raza8386/sama-csf-chatbot
+
+This project taught me that the gap between compliance knowledge and AI is smaller than we think. Excited to keep building at the intersection of GRC and AI. 🤖
+
+Would love your feedback! 🙌
+
+#CyberSecurity #GRC #SAMA #Compliance #AI #RAG #LangChain #Python #FinTech #SaudiArabia #MachineLearning #Anthropic #OpenToWork
