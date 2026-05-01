@@ -1,11 +1,11 @@
 # Secret keys — NEVER commit these
 .env
 
-# ChromaDB vector index (large, rebuild with index_docs.py)
-sama_db/
+# ChromaDB vector index — uncomment below to exclude (rebuild with index_docs.py)
+# sama_db/
 
-# PDF (too large for GitHub, add manually)
-sama_csf.pdf
+# PDF — uncomment below to exclude
+# sama_csf.pdf
 
 # Python
 __pycache__/
