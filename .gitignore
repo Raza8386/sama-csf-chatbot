@@ -1,5 +1,6 @@
 # Secret keys — NEVER commit these
 .env
+.streamlit/secrets.toml
 
 # ChromaDB vector index — uncomment below to exclude (rebuild with index_docs.py)
 # sama_db/

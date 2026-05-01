@@ -12,8 +12,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Anthropic credentials ───────────────────────────────────────────────────
-# Reads from .env file. Raises a clear error if not set.
+# Check .env first (local), then Streamlit secrets (cloud deployment)
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+if not ANTHROPIC_API_KEY:
+    try:
+        import streamlit as st
+        ANTHROPIC_API_KEY = st.secrets.get("ANTHROPIC_API_KEY")
+    except Exception:
+        pass
 
 if not ANTHROPIC_API_KEY:
     raise EnvironmentError(
