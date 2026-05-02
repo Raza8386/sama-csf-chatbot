@@ -18,6 +18,10 @@ import json
 import streamlit as st
 import streamlit.components.v1 as components
 
+# Agent module (imported lazily inside render_agent_tab to avoid errors if
+# the anthropic package is missing on first install)
+
+
 # ── Page config must be the very first Streamlit call ────────────────────────
 st.set_page_config(
     page_title="SAMA CSF Compliance Assistant",
@@ -554,6 +558,93 @@ def ask_question(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  Agent tab
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def render_agent_tab(vector_store, selected_framework: str):
+    """
+    Render the Agent Mode tab.
+    The user states a complex compliance goal; Claude autonomously searches
+    the frameworks and produces a comprehensive answer.
+    """
+    st.markdown("### 🤖 Agent Mode")
+    st.caption(
+        "Give the agent a complex compliance goal. It will autonomously decide "
+        "which frameworks to search, how many times, and when it has enough "
+        "information to answer."
+    )
+
+    # ── Example goals ─────────────────────────────────────────────────────────
+    with st.expander("💡 Example goals — click to expand"):
+        st.markdown(
+            """
+- *"Compare incident response requirements across SAMA CSF, PDPL, and NCA ECC"*
+- *"What do I need to reach SAMA CSF maturity level 3 in cybersecurity governance?"*
+- *"Summarise all data subject rights under PDPL and map them to NCA ECC controls"*
+- *"What are the third-party risk management requirements across all frameworks?"*
+- *"List all penalties mentioned in PDPL and what triggers them"*
+            """
+        )
+
+    # ── Goal input ────────────────────────────────────────────────────────────
+    goal = st.text_area(
+        "Enter your compliance goal:",
+        placeholder=(
+            "e.g. Compare how SAMA CSF and PDPL address data breach notification "
+            "requirements and list the key differences..."
+        ),
+        height=130,
+    )
+
+    col_btn, col_info = st.columns([1, 4])
+    with col_btn:
+        run_clicked = st.button("🚀 Run Agent", type="primary", use_container_width=True)
+    with col_info:
+        st.caption("The agent may make 2–5 searches before answering. This takes ~10–20 seconds.")
+
+    # ── Run the agent ─────────────────────────────────────────────────────────
+    if run_clicked:
+        if not goal.strip():
+            st.warning("Please enter a compliance goal above.")
+            return
+
+        api_key = st.session_state.get("api_key") or ANTHROPIC_API_KEY
+        if not api_key:
+            st.error("Please enter your Anthropic API key in the sidebar first.")
+            return
+
+        try:
+            from agent import run_grc_agent
+        except Exception as import_err:
+            st.error(f"Could not load agent module: {import_err}")
+            return
+
+        with st.spinner("🤖 Agent is researching your question..."):
+            result = run_grc_agent(goal, vector_store, api_key)
+
+        # ── Agent reasoning log ────────────────────────────────────────────
+        if result["tool_calls"]:
+            label = (
+                f"🔍 Agent reasoning — "
+                f"{result['iterations']} step(s), "
+                f"{len(result['tool_calls'])} search(es) performed"
+            )
+            with st.expander(label, expanded=False):
+                for i, call in enumerate(result["tool_calls"], 1):
+                    st.markdown(f"**Step {i} — `{call['tool']}`**")
+                    st.json(call["input"])
+                    st.caption(f"Result preview: {call['result_preview']}")
+                    if i < len(result["tool_calls"]):
+                        st.divider()
+
+        # ── Final answer ───────────────────────────────────────────────────
+        st.markdown("---")
+        st.markdown("### 📋 Agent Answer")
+        st.markdown(result["answer"])
+        render_copy_button(result["answer"], key="agent_copy")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  App entry point
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -589,36 +680,45 @@ def main():
         )
         st.stop()
 
-    # Build the RAG chain (rebuilt when top_k or framework changes)
-    rag_chain = build_rag_chain(vector_store, top_k, selected_framework)
-
     # ── Guard: require API key ────────────────────────────────────────────────
     if not st.session_state.get("api_key") and not ANTHROPIC_API_KEY:
         st.info("👈 Enter your **Anthropic API key** in the sidebar to start chatting.")
         st.stop()
 
-    # ── Render existing conversation ──────────────────────────────────────────
-    render_chat_history()
+    # ── Tabs: Chat Mode vs Agent Mode ─────────────────────────────────────────
+    chat_tab, agent_tab = st.tabs(["💬 Chat Mode", "🤖 Agent Mode"])
 
-    # ── Starter chips in main area (only when chat is empty) ─────────────────
-    if not st.session_state.messages:
-        render_starter_chips(selected_framework)
+    # ── Chat tab ──────────────────────────────────────────────────────────────
+    with chat_tab:
+        # Build the RAG chain (rebuilt when top_k or framework changes)
+        rag_chain = build_rag_chain(vector_store, top_k, selected_framework)
 
-    # ── Chat input box — placeholder changes with selected framework ──────────
-    if selected_framework == "All Frameworks":
-        placeholder = "Ask a compliance question across all frameworks..."
-    else:
-        placeholder = f"Ask a {selected_framework} compliance question..."
+        # Render existing conversation
+        render_chat_history()
 
-    typed_question = st.chat_input(placeholder)
+        # Starter chips only when chat is empty
+        if not st.session_state.messages:
+            render_starter_chips(selected_framework)
 
-    # Sidebar question button takes priority, then typed input
-    sidebar_question = st.session_state.pop("sidebar_question", None)
-    active_question = typed_question or sidebar_question
+        # Chat input — placeholder changes with selected framework
+        if selected_framework == "All Frameworks":
+            placeholder = "Ask a compliance question across all frameworks..."
+        else:
+            placeholder = f"Ask a {selected_framework} compliance question..."
 
-    if active_question:
-        ask_question(rag_chain, active_question, selected_framework, selected_domains, show_sources)
-        st.rerun()
+        typed_question = st.chat_input(placeholder)
+
+        # Sidebar question button takes priority, then typed input
+        sidebar_question = st.session_state.pop("sidebar_question", None)
+        active_question = typed_question or sidebar_question
+
+        if active_question:
+            ask_question(rag_chain, active_question, selected_framework, selected_domains, show_sources)
+            st.rerun()
+
+    # ── Agent tab ─────────────────────────────────────────────────────────────
+    with agent_tab:
+        render_agent_tab(vector_store, selected_framework)
 
 
 if __name__ == "__main__":
