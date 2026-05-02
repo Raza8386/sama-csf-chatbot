@@ -14,7 +14,9 @@ This file handles:
 
 import os
 import sys
+import json
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ── Page config must be the very first Streamlit call ────────────────────────
 st.set_page_config(
@@ -128,6 +130,85 @@ def get_confidence_label(num_sources: int) -> tuple[str, str]:
         return "Medium", "🟡"
     else:
         return "Low", "🔴"
+
+
+def generate_followup_questions(llm, question: str, answer: str, framework: str) -> list:
+    """
+    Ask Claude to suggest 3 short follow-up compliance questions based on the
+    current Q&A. Returns a list of strings (empty list on any failure).
+    """
+    from langchain_core.messages import HumanMessage
+
+    prompt = (
+        f"You are a GRC compliance advisor.\n"
+        f"Framework: {framework}\n"
+        f"Question asked: {question}\n"
+        f"Answer provided: {answer[:600]}\n\n"
+        "Suggest exactly 3 short, specific follow-up questions a GRC auditor "
+        "might ask next. Rules:\n"
+        "- Each question must be directly related to the topic above\n"
+        "- Keep each question under 15 words\n"
+        "- Return ONLY a valid JSON array of exactly 3 strings, nothing else\n\n"
+        'Example: ["Question one?", "Question two?", "Question three?"]'
+    )
+
+    try:
+        response = llm.invoke([HumanMessage(content=prompt)])
+        content = response.content.strip()
+        start = content.find("[")
+        end = content.rfind("]") + 1
+        if start >= 0 and end > start:
+            questions = json.loads(content[start:end])
+            return [q for q in questions if isinstance(q, str)][:3]
+    except Exception:
+        pass
+    return []
+
+
+def render_copy_button(text: str, key: str):
+    """
+    Render a 'Copy Answer' button that copies `text` to the clipboard via JS.
+    Shows a brief '✅ Copied!' confirmation, then resets after 2 seconds.
+    """
+    escaped = (
+        text.replace("\\", "\\\\")
+            .replace("`", "\\`")
+            .replace("${", "\\${")
+    )
+    components.html(
+        f"""
+        <button
+            onclick="navigator.clipboard.writeText(`{escaped}`).then(() => {{
+                this.innerHTML = '✅ Copied!';
+                setTimeout(() => this.innerHTML = '📋 Copy Answer', 2000);
+            }})"
+            style="
+                background:#f0f2f6;
+                border:1px solid #d0d3d9;
+                border-radius:6px;
+                padding:4px 14px;
+                cursor:pointer;
+                font-size:13px;
+                color:#31333f;
+                margin-top:6px;
+            "
+        >📋 Copy Answer</button>
+        """,
+        height=42,
+    )
+
+
+def render_followup_chips(questions: list, msg_idx: int):
+    """
+    Render 2-3 follow-up question chips below an assistant answer.
+    Clicking a chip sets it as the next question via session state.
+    """
+    if not questions:
+        return
+    st.markdown("**💬 You might also ask:**")
+    for i, q in enumerate(questions):
+        if st.button(q, key=f"followup_{msg_idx}_{i}", use_container_width=False):
+            st.session_state.sidebar_question = q
 
 
 def initialise_session_state():
@@ -358,16 +439,34 @@ def render_source_documents(source_docs: list, show_sources: bool):
 
 def render_chat_history():
     """Replay every message in session state so the conversation persists on rerun."""
-    for message in st.session_state.messages:
+
+    # Find the index of the last assistant message (follow-ups shown only there)
+    last_assistant_idx = None
+    for i, msg in enumerate(st.session_state.messages):
+        if msg["role"] == "assistant":
+            last_assistant_idx = i
+
+    for idx, message in enumerate(st.session_state.messages):
         role = message["role"]
         with st.chat_message(role):
             st.markdown(message["content"])
-            # Re-render source documents stored alongside assistant messages
-            if role == "assistant" and "source_docs" in message:
-                render_source_documents(
-                    message["source_docs"],
-                    show_sources=message.get("show_sources", True),
-                )
+
+            if role == "assistant":
+                # Re-render source documents stored alongside assistant messages
+                if "source_docs" in message:
+                    render_source_documents(
+                        message["source_docs"],
+                        show_sources=message.get("show_sources", True),
+                    )
+
+                # Copy button for every assistant message
+                render_copy_button(message["content"], key=f"copy_{idx}")
+
+                # Follow-up chips only for the most recent answer
+                if idx == last_assistant_idx:
+                    render_followup_chips(
+                        message.get("followup_questions", []), idx
+                    )
 
 
 def ask_question(
@@ -401,6 +500,7 @@ def ask_question(
         st.markdown(user_question)
 
     # Run the chain and stream the assistant response
+    followup_questions = []
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         full_response = ""
@@ -422,6 +522,16 @@ def ask_question(
             # Show source documents below the answer
             render_source_documents(source_docs, show_sources)
 
+            # Copy button
+            render_copy_button(full_response, key="copy_live")
+
+            # Generate and display follow-up question suggestions
+            with st.spinner("Generating follow-up suggestions..."):
+                followup_questions = generate_followup_questions(
+                    llm, user_question, full_response, selected_framework
+                )
+            render_followup_chips(followup_questions, msg_idx=len(st.session_state.messages))
+
         except Exception as api_error:
             error_message = (
                 "⚠️  An error occurred while querying the AI model.\n\n"
@@ -438,6 +548,7 @@ def ask_question(
         "source_docs": source_docs,
         "show_sources": show_sources,
         "domains_filter": selected_domains,
+        "followup_questions": followup_questions,
     })
     st.session_state.question_count += 1
 
