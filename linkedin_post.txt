@@ -27,6 +27,13 @@ GRC professionals, cybersecurity auditors, compliance officers, DPOs, and anyone
 👉 Try it live: https://sama-csf-chatbot-hx8aqfwx3appqe9qsh366x7.streamlit.app
 💻 GitHub: https://github.com/Raza8386/sama-csf-chatbot
 
+🧠 5 Key Skills This Project Sharpened:
+1. AI & Prompt Engineering — designing structured compliance prompts for Claude to produce audit-grade answers
+2. RAG Architecture — building a full retrieval pipeline from PDF chunking to semantic search to LLM generation
+3. Python Development — end-to-end application development with LangChain, ChromaDB, and Streamlit
+4. GRC Domain Knowledge — translating SAMA CSF, PDPL, and NCA ECC requirements into a queryable knowledge base
+5. Cloud Deployment — publishing a production-ready AI app on Streamlit Community Cloud with GitHub CI
+
 This project showed me that the gap between compliance knowledge and AI is smaller than we think. What used to take hours of manual framework navigation now takes seconds. 🤖
 
 Excited to keep building at the intersection of GRC and AI. Would love your feedback! 🙌
