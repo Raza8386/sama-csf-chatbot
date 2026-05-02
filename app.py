@@ -27,7 +27,7 @@ st.set_page_config(
 # ── Config import ─────────────────────────────────────────────────────────────
 # Centralised settings — edit config.py, not this file
 try:
-    from config import (
+    from chatbot_config import (
         ANTHROPIC_API_KEY,
         EMBEDDING_MODEL,
         LLM_MODEL,

@@ -17,7 +17,7 @@ import sys
 
 # ── Config import ────────────────────────────────────────────────────────────
 try:
-    from config import (
+    from chatbot_config import (
         ANTHROPIC_API_KEY,
         EMBEDDING_MODEL,
         CHUNK_SIZE,
