@@ -1,25 +1,36 @@
-🚀 Excited to share my latest project — GRC Compliance Assistant for Saudi Regulations!
+🚀 Excited to share my second latest project — GRC Compliance Assistant for KSA Regulations!
 
-As a GRC professional, I've always wanted a smarter way to navigate complex Saudi regulatory frameworks. So I built one. 🛡️
+As a GRC professional, I've always wanted a smarter way to navigate complex KSA regulatory frameworks. So I built one — and then made it agentic. 🛡️🤖
 
-I developed an AI-powered compliance chatbot that now covers THREE major Saudi frameworks — all in a single app, with zero hallucination.
+I developed an AI-powered compliance tool that covers THREE major Saudi frameworks in a single app, with two modes of intelligence:
 
 📋 Frameworks covered:
 - 🏦 SAMA Cyber Security Framework (CSF)
 - 🔒 Personal Data Protection Law (PDPL)
 - 🛡️ NCA Essential Cybersecurity Controls (ECC)
 
+💬 Mode 1 — Chat Mode (RAG Chatbot):
+Ask a specific compliance question → the app retrieves the most relevant chunks from the official PDF → Claude answers with source page references. Fast, grounded, zero hallucination.
+
+🤖 Mode 2 — Agent Mode (Agentic AI):
+Give the agent a complex compliance goal → Claude autonomously decides which frameworks to search, runs multiple searches, evaluates the results, and synthesises a comprehensive answer — all without you directing each step.
+
+Example agent goals:
+→ "Compare incident response requirements across SAMA CSF, PDPL, and NCA ECC"
+→ "What do I need to reach SAMA CSF maturity level 3 in cybersecurity governance?"
+→ "List all penalties under PDPL and what triggers them"
+
 🔧 How I built it:
-- RAG (Retrieval Augmented Generation) pipeline using LangChain + ChromaDB
-- Anthropic Claude AI for structured, professional compliance answers
-- Free local embeddings via HuggingFace sentence-transformers (no API cost)
-- Single ChromaDB collection with framework metadata tagging for smart filtering
-- Dynamic UI — suggested questions and domain filters change per selected framework
-- Fully deployed on Streamlit Community Cloud — publicly accessible
-- Code published on GitHub
+- Claude Tool Use (Anthropic) for the agentic loop — Claude calls search tools autonomously
+- RAG pipeline using LangChain + ChromaDB for grounded retrieval
+- HuggingFace sentence-transformers for free local embeddings
+- Framework metadata tagging for smart cross-framework filtering
+- Follow-up question suggestions after every answer
+- One-click copy button for pasting answers into audit reports
+- Fully deployed on Streamlit Community Cloud
 
 💡 What it does:
-Select a framework, ask any compliance question, and get an instant structured answer — with the exact PDF page it came from. Maturity levels, control objectives, legal obligations, penalties, and implementation guidance, all in seconds.
+Select a framework, ask a question or give a complex goal, and get a structured compliance answer — with source pages, maturity levels, legal obligations, and implementation guidance, all in seconds.
 
 🎯 Built for:
 GRC professionals, cybersecurity auditors, compliance officers, DPOs, and anyone working within Saudi Arabia's regulatory landscape — banking, fintech, government, or any regulated entity.
@@ -27,15 +38,17 @@ GRC professionals, cybersecurity auditors, compliance officers, DPOs, and anyone
 👉 Try it live: https://sama-csf-chatbot-hx8aqfwx3appqe9qsh366x7.streamlit.app
 💻 GitHub: https://github.com/Raza8386/sama-csf-chatbot
 
+Note: Please enter your Anthropic API key in the sidebar (get one free at console.anthropic.com)
+
 🧠 5 Key Skills This Project Sharpened:
 1. AI & Prompt Engineering — designing structured compliance prompts for Claude to produce audit-grade answers
-2. RAG Architecture — building a full retrieval pipeline from PDF chunking to semantic search to LLM generation
+2. Agentic AI Development — building a Claude tool-use loop where the model autonomously plans and executes multi-step searches
 3. Python Development — end-to-end application development with LangChain, ChromaDB, and Streamlit
 4. GRC Domain Knowledge — translating SAMA CSF, PDPL, and NCA ECC requirements into a queryable knowledge base
 5. Cloud Deployment — publishing a production-ready AI app on Streamlit Community Cloud with GitHub CI
 
-This project showed me that the gap between compliance knowledge and AI is smaller than we think. What used to take hours of manual framework navigation now takes seconds. 🤖
+This project showed me that the gap between compliance knowledge and AI is smaller than we think. What used to take hours of manual framework navigation now takes seconds — and with the agent, it takes one sentence. 🤖
 
 Excited to keep building at the intersection of GRC and AI. Would love your feedback! 🙌
 
-#CyberSecurity #GRC #SAMA #PDPL #NCA #Compliance #AI #RAG #LangChain #Python #FinTech #SaudiArabia #DataProtection #Anthropic #GenerativeAI #ComplianceTech
+#CyberSecurity #GRC #SAMA #PDPL #NCA #Compliance #AgenticAI #AI #RAG #LangChain #Python #FinTech #SaudiArabia #DataProtection #Anthropic #GenerativeAI #ComplianceTech #ClaudeAI
