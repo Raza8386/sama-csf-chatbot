@@ -23,7 +23,7 @@ and Claude Code can call directly — no Streamlit UI needed.
 
 ── INSTALL INSTRUCTIONS ─────────────────────────────────────────────────────
 Find your Claude Desktop config file:
-  Windows : %APPDATA%\Claude\claude_desktop_config.json
+  Windows : %APPDATA%\\Claude\\claude_desktop_config.json
   Mac     : ~/Library/Application Support/Claude/claude_desktop_config.json
 
 Add this block (update the path to match your machine):
