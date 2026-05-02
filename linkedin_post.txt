@@ -1,28 +1,34 @@
-🚀 Excited to share my latest project — SAMA CSF Compliance Assistant!
+🚀 Excited to share my latest project — GRC Compliance Assistant for Saudi Regulations!
 
-As a GRC professional, I've always wanted a smarter way to navigate the SAMA Cyber Security Framework. So I built one. 🛡️
+As a GRC professional, I've always wanted a smarter way to navigate complex Saudi regulatory frameworks. So I built one. 🛡️
 
-I developed an AI-powered compliance chatbot that answers SAMA CSF questions in seconds — grounded directly in the official framework document with zero hallucination.
+I developed an AI-powered compliance chatbot that now covers THREE major Saudi frameworks — all in a single app, with zero hallucination.
 
-🔧 What I built:
+📋 Frameworks covered:
+- 🏦 SAMA Cyber Security Framework (CSF)
+- 🔒 Personal Data Protection Law (PDPL)
+- 🛡️ NCA Essential Cybersecurity Controls (ECC)
+
+🔧 How I built it:
 - RAG (Retrieval Augmented Generation) pipeline using LangChain + ChromaDB
 - Anthropic Claude AI for structured, professional compliance answers
-- Free local embeddings via HuggingFace sentence-transformers
-- Clean Streamlit web interface with domain filters and source page references
+- Free local embeddings via HuggingFace sentence-transformers (no API cost)
+- Single ChromaDB collection with framework metadata tagging for smart filtering
+- Dynamic UI — suggested questions and domain filters change per selected framework
 - Fully deployed on Streamlit Community Cloud — publicly accessible
 - Code published on GitHub
 
 💡 What it does:
-Ask any SAMA CSF compliance question and get an instant structured answer with the exact PDF page it came from — maturity levels, control objectives, implementation guidance and more.
+Select a framework, ask any compliance question, and get an instant structured answer — with the exact PDF page it came from. Maturity levels, control objectives, legal obligations, penalties, and implementation guidance, all in seconds.
 
 🎯 Built for:
-GRC professionals, cybersecurity auditors, compliance officers, and anyone working with SAMA-regulated financial institutions in Saudi Arabia.
+GRC professionals, cybersecurity auditors, compliance officers, DPOs, and anyone working within Saudi Arabia's regulatory landscape — banking, fintech, government, or any regulated entity.
 
 👉 Try it live: https://sama-csf-chatbot-hx8aqfwx3appqe9qsh366x7.streamlit.app
 💻 GitHub: https://github.com/Raza8386/sama-csf-chatbot
 
-This project taught me that the gap between compliance knowledge and AI is smaller than we think. Excited to keep building at the intersection of GRC and AI. 🤖
+This project showed me that the gap between compliance knowledge and AI is smaller than we think. What used to take hours of manual framework navigation now takes seconds. 🤖
 
-Would love your feedback! 🙌
+Excited to keep building at the intersection of GRC and AI. Would love your feedback! 🙌
 
-#CyberSecurity #GRC #SAMA #Compliance #AI #RAG #LangChain #Python #FinTech #SaudiArabia #MachineLearning #Anthropic #OpenToWork
+#CyberSecurity #GRC #SAMA #PDPL #NCA #Compliance #AI #RAG #LangChain #Python #FinTech #SaudiArabia #DataProtection #Anthropic #GenerativeAI #ComplianceTech
