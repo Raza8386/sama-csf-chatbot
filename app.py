@@ -43,17 +43,16 @@ try:
         SAMA_DOMAINS,
         FRAMEWORK_DOMAINS,
         PDF_SOURCES,
-        SYSTEM_PROMPT,
+        SYSTEM_INSTRUCTIONS,
     )
 except Exception as err:
     st.error(f"**Startup error:** {type(err).__name__}: {err}")
     st.stop()
 
-# ── LangChain imports ─────────────────────────────────────────────────────────
+# ── LangChain + Anthropic imports ─────────────────────────────────────────────
 try:
-    from langchain_anthropic import ChatAnthropic
+    from anthropic import Anthropic
     from langchain_community.vectorstores import Chroma
-    from langchain_core.prompts import ChatPromptTemplate
     try:
         from langchain_huggingface import HuggingFaceEmbeddings
     except ImportError:
@@ -91,11 +90,10 @@ def load_vector_store():
 
 def build_rag_chain(vector_store: Chroma, top_k: int, selected_framework: str) -> tuple:
     """
-    Build a retriever + LLM + prompt using modern LCEL.
+    Build a retriever and Anthropic client.
     Filters ChromaDB by framework metadata when a specific framework is selected.
-    Returns a (retriever, llm, prompt) tuple.
+    Returns a (retriever, client) tuple.
     """
-    # Apply metadata filter when a specific framework is chosen
     if selected_framework and selected_framework != "All Frameworks":
         search_kwargs = {
             "k": top_k,
@@ -105,22 +103,14 @@ def build_rag_chain(vector_store: Chroma, top_k: int, selected_framework: str) -
         search_kwargs = {"k": top_k}
 
     retriever = vector_store.as_retriever(
-        search_type="similarity",
+        search_type="mmr",
         search_kwargs=search_kwargs,
     )
 
-    # Use key from sidebar input if provided, otherwise fall back to config/env
     api_key = st.session_state.get("api_key") or ANTHROPIC_API_KEY
+    client = Anthropic(api_key=api_key)
 
-    llm = ChatAnthropic(
-        model=LLM_MODEL,
-        temperature=0,
-        anthropic_api_key=api_key,
-    )
-
-    prompt = ChatPromptTemplate.from_template(SYSTEM_PROMPT)
-
-    return retriever, llm, prompt
+    return retriever, client
 
 
 def get_confidence_label(num_sources: int) -> tuple[str, str]:
@@ -136,13 +126,11 @@ def get_confidence_label(num_sources: int) -> tuple[str, str]:
         return "Low", "🔴"
 
 
-def generate_followup_questions(llm, question: str, answer: str, framework: str) -> list:
+def generate_followup_questions(client: Anthropic, question: str, answer: str, framework: str) -> list:
     """
     Ask Claude to suggest 3 short follow-up compliance questions based on the
     current Q&A. Returns a list of strings (empty list on any failure).
     """
-    from langchain_core.messages import HumanMessage
-
     prompt = (
         f"You are a GRC compliance advisor.\n"
         f"Framework: {framework}\n"
@@ -157,8 +145,12 @@ def generate_followup_questions(llm, question: str, answer: str, framework: str)
     )
 
     try:
-        response = llm.invoke([HumanMessage(content=prompt)])
-        content = response.content.strip()
+        response = client.messages.create(
+            model=LLM_MODEL,
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        content = response.content[0].text.strip()
         start = content.find("[")
         end = content.rfind("]") + 1
         if start >= 0 and end > start:
@@ -483,8 +475,14 @@ def ask_question(
     """
     Run the RAG chain for `user_question`, stream the response, then store
     both the question and answer in session state for conversation history.
+
+    Features:
+    - Prompt caching: static system instructions are cached on every call.
+    - Streaming: tokens appear progressively as Claude generates them.
+    - Conversation memory: last 3 exchanges are passed as context so follow-up
+      questions work naturally.
     """
-    retriever, llm, prompt = rag_chain
+    retriever, client = rag_chain
 
     # Build augmented question with framework and domain hints
     hints = []
@@ -493,34 +491,61 @@ def ask_question(
     if selected_domains:
         hints.append(f"Domains: {', '.join(selected_domains)}")
 
-    if hints:
-        augmented_question = f"[{' | '.join(hints)}]\n\n{user_question}"
-    else:
-        augmented_question = user_question
+    augmented_question = f"[{' | '.join(hints)}]\n\n{user_question}" if hints else user_question
 
     # Add user message to history and render it immediately
     st.session_state.messages.append({"role": "user", "content": user_question})
     with st.chat_message("user"):
         st.markdown(user_question)
 
-    # Run the chain and stream the assistant response
     followup_questions = []
+    source_docs = []
+    full_response = ""
+
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
-        full_response = ""
-        source_docs = []
 
         try:
             # Step 1: retrieve relevant chunks from ChromaDB
             source_docs = retriever.invoke(augmented_question)
             context = "\n\n".join(doc.page_content for doc in source_docs)
 
-            # Step 2: format prompt and call Claude
-            messages = prompt.format_messages(context=context, question=augmented_question)
-            response = llm.invoke(messages)
-            full_response = response.content
+            # Step 2: build conversation history (last 3 exchanges = 6 messages),
+            # excluding the user message we just appended.
+            MAX_HISTORY = 6
+            api_messages = []
+            for msg in st.session_state.messages[:-1][-MAX_HISTORY:]:
+                if msg["role"] in ("user", "assistant"):
+                    api_messages.append({
+                        "role": msg["role"],
+                        "content": msg["content"],
+                    })
 
-            # Display the response
+            # Current turn: inject retrieved context alongside the question
+            api_messages.append({
+                "role": "user",
+                "content": (
+                    f"<context>\n{context}\n</context>\n\n"
+                    f"Question: {augmented_question}"
+                ),
+            })
+
+            # Step 3: stream response with cached system instructions
+            with client.messages.stream(
+                model=LLM_MODEL,
+                max_tokens=2048,
+                system=[{
+                    "type": "text",
+                    "text": SYSTEM_INSTRUCTIONS,
+                    "cache_control": {"type": "ephemeral"},
+                }],
+                messages=api_messages,
+            ) as stream:
+                for text in stream.text_stream:
+                    full_response += text
+                    response_placeholder.markdown(full_response + "▌")
+
+            # Remove the streaming cursor once done
             response_placeholder.markdown(full_response)
 
             # Show source documents below the answer
@@ -532,7 +557,7 @@ def ask_question(
             # Generate and display follow-up question suggestions
             with st.spinner("Generating follow-up suggestions..."):
                 followup_questions = generate_followup_questions(
-                    llm, user_question, full_response, selected_framework
+                    client, user_question, full_response, selected_framework
                 )
             render_followup_chips(followup_questions, msg_idx=len(st.session_state.messages))
 
